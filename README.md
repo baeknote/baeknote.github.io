@@ -4,7 +4,7 @@ A self-contained HTML arcade game set in an icy tundra. Collect vodka bottles, a
 
 ## Play
 
-Open [outputs/tundra-pacman.html](outputs/tundra-pacman.html) in a modern browser.
+Open [index.html](index.html) in a modern browser.
 
 ## Controls
 
