@@ -1,11 +1,11 @@
 <!doctype html>
-<!-- Tundra Pacman: a self-contained, mobile-ready arcade game with fair procedural mazes. -->
+<!-- Tundra Pacman: a self-contained, mobile-ready arcade game with fair, escape-friendly tundra mazes. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06192e">
-  <meta name="description" content="A tundra-themed Pacman game with reachable vodka collectibles, smooth ghost movement, and touch controls.">
+  <meta name="description" content="A tundra-themed Pacman game with escape-friendly loop mazes, reachable vodka collectibles, and touch controls.">
   <title>Tundra Pacman — The Vodka Tundra</title>
   <style>
     :root { color-scheme: dark; }
@@ -81,22 +81,33 @@
       let mapTemplate = [];
       const dirs = { up:{x:0,y:-1}, down:{x:0,y:1}, left:{x:-1,y:0}, right:{x:1,y:0} };
       let map, player, ghosts, score, running, tick, last, tile, w, h;
-      function createTundraMaze() {
-        const grid = Array.from({length: rows}, () => Array(cols).fill('#'));
-        const stack = [[9, 15]]; grid[15][9] = '.';
-        while (stack.length) {
-          const [x, y] = stack[stack.length - 1];
-          const choices = [[2,0],[-2,0],[0,2],[0,-2]].map(([dx,dy]) => [x+dx,y+dy,dx,dy]).filter(([nx,ny]) => nx > 0 && nx < cols-1 && ny > 0 && ny < rows-1 && grid[ny][nx] === '#');
-          if (!choices.length) { stack.pop(); continue; }
-          const [nx, ny, dx, dy] = choices[Math.floor(Math.random() * choices.length)];
-          grid[y + dy / 2][x + dx / 2] = '.'; grid[ny][nx] = '.'; stack.push([nx, ny]);
+      function hasConnectedFloor(grid) {
+        const seen = Array.from({length: rows}, () => Array(cols).fill(false));
+        const queue = [[9, 15]]; seen[15][9] = true;
+        for (let i = 0; i < queue.length; i++) {
+          const [x, y] = queue[i];
+          Object.values(dirs).forEach(d => {
+            const nx = x + d.x, ny = y + d.y;
+            if (!seen[ny]?.[nx] && grid[ny]?.[nx] === '.') { seen[ny][nx] = true; queue.push([nx, ny]); }
+          });
         }
-        // A few extra thawed passages make the maze less linear without ever
-        // separating the connected path network created above.
-        for (let y = 1; y < rows - 1; y++) for (let x = 1; x < cols - 1; x++) {
-          const horizontal = grid[y][x-1] === '.' && grid[y][x+1] === '.';
-          const vertical = grid[y-1][x] === '.' && grid[y+1][x] === '.';
-          if (grid[y][x] === '#' && (horizontal || vertical) && Math.random() < .12) grid[y][x] = '.';
+        return seen.flat().filter(Boolean).length === grid.flat().filter(cell => cell === '.').length;
+      }
+      function createTundraMaze() {
+        // The protected lanes form overlapping loops, so Pacman always has a
+        // second route instead of being forced into a dead end by a ghost.
+        const grid = Array.from({length: rows}, (_, y) => Array.from({length: cols}, (_, x) => (x === 0 || x === cols-1 || y === 0 || y === rows-1 ? '#' : '.')));
+        const isEscapeLane = (x, y) => x === 1 || x === cols - 2 || y === 1 || y === rows - 2 || x === 5 || x === 9 || x === 13 || y === 3 || y === 7 || y === 11;
+        const floeShapes = [ [[0,0],[1,0],[2,0]], [[0,0],[0,1],[0,2]], [[0,0],[1,0],[0,1]], [[0,0],[1,0],[1,1]] ];
+        let floes = 0, attempts = 0;
+        while (floes < 17 && attempts++ < 160) {
+          const shape = floeShapes[Math.floor(Math.random() * floeShapes.length)];
+          const x = 2 + Math.floor(Math.random() * (cols - 5));
+          const y = 2 + Math.floor(Math.random() * (rows - 5));
+          const cells = shape.map(([dx, dy]) => [x + dx, y + dy]);
+          if (!cells.every(([cx, cy]) => cx > 0 && cx < cols-1 && cy > 0 && cy < rows-1 && !isEscapeLane(cx, cy) && grid[cy][cx] === '.')) continue;
+          cells.forEach(([cx, cy]) => grid[cy][cx] = '#');
+          if (hasConnectedFloor(grid)) floes++; else cells.forEach(([cx, cy]) => grid[cy][cx] = '.');
         }
         return grid.map(row => row.join(''));
       }
@@ -145,7 +156,10 @@
         tick++; if (!move(player,player.next)) move(player,player.dir);
         if (map[player.y][player.x]) { map[player.y][player.x] = false; score += 10; updateHud(); }
         if (ghosts.some(g => g.x === player.x && g.y === player.y)) return end(false);
-        ghosts.forEach(g => {
+        ghosts.forEach((g, index) => {
+          // Ghosts move on alternate beats, giving Pacman room to choose one
+          // of the maze's looped escape routes instead of facing equal speed.
+          if ((tick + index) % 2) return;
           g.brain++;
           const options = Object.keys(dirs).filter(d => !isWall(g.x+dirs[d].x,g.y+dirs[d].y));
           const reverse = {up:'down',down:'up',left:'right',right:'left'}[g.dir];

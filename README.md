@@ -14,7 +14,9 @@ Open [index.html](index.html) in a modern browser.
 
 ## Game behavior
 
-- Each new run creates a varied ice maze using a connected-path generator.
+- Each new run creates a varied ice maze with protected, overlapping escape loops.
 - A reachability check prevents vodka bottles from appearing in isolated areas.
+- Ice floes are only placed when they preserve a fully connected floor network.
+- Ghosts move on alternate beats, giving Pacman time to take a different route.
 - Every vodka bottle is worth 10 points.
 - Touching a ghost ends the game.
