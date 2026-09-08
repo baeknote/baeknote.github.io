@@ -1,10 +1,12 @@
 <!doctype html>
+<!-- Tundra Pacman: a self-contained, mobile-ready arcade game with fair procedural mazes. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06192e">
-  <title>Tundra Pacman</title>
+  <meta name="description" content="A tundra-themed Pacman game with reachable vodka collectibles, smooth ghost movement, and touch controls.">
+  <title>Tundra Pacman — The Vodka Tundra</title>
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -36,12 +38,15 @@
     .legend span { display: inline-flex; align-items: center; gap: 6px; }
     .bottle { width: 11px; height: 16px; display: inline-block; border: 2px solid #c7fbff; border-radius: 3px 3px 5px 5px; background: #49b8e1; position: relative; }
     .bottle:before { content: ""; position: absolute; width: 5px; height: 5px; border: 2px solid #c7fbff; border-bottom: 0; top: -7px; left: 1px; border-radius: 2px 2px 0 0; }
-    .controls { display: none; grid-template-columns: repeat(3, 52px); justify-content: center; gap: 7px; margin: 18px auto 0; }
-    .controls button { width: 52px; height: 46px; padding: 0; border-radius: 12px; font-size: 1.35rem; color: #dffcff; background: #0c5079; border-color: #7de7ff; box-shadow: 0 3px 0 #042a48; }
-    .controls button:first-child { grid-column: 2; }
-    .controls button:last-child { grid-column: 3; grid-row: 2; }
-    .controls button:nth-child(3) { grid-column: 1; grid-row: 2; }
-    @media (pointer: coarse) { .controls { display: grid; } .legend .keys { display: none; } }
+    .controls { display: none; position: relative; width: 154px; height: 154px; margin: 20px auto 0; border: 7px solid #dffcff; border-radius: 50%; background: #0a3859; box-shadow: 0 0 0 3px #247da3, 0 0 20px #53dfff66, inset 0 0 20px #02132299; touch-action: none; }
+    .controls button { position: absolute; z-index: 2; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; color: #e8fcff; background: transparent; box-shadow: none; font: 900 2.25rem/.8 system-ui, sans-serif; text-shadow: 0 2px 0 #063452; }
+    .controls button:hover, .controls button:active { color: #ffe02d; transform: none; box-shadow: none; filter: none; }
+    .controls button[data-dir="up"] { top: 7px; left: 48px; }
+    .controls button[data-dir="down"] { bottom: 3px; left: 48px; }
+    .controls button[data-dir="left"] { left: 3px; top: 48px; }
+    .controls button[data-dir="right"] { right: 3px; top: 48px; }
+    .pad-core { position: absolute; inset: 43px; border: 7px solid #dffcff; border-radius: 50%; background: #0b456c; box-shadow: inset 0 0 9px #031c32; }
+    @media (pointer: coarse) { .controls { display: block; } .legend .keys { display: none; } }
   </style>
 </head>
 <body>
@@ -63,7 +68,7 @@
     </section>
     <div class="legend"><span><i class="bottle"></i> VODKA +10</span><span class="keys">ARROW KEYS / WASD TO MOVE</span><span id="remaining">BOTTLES: 0</span></div>
     <div class="controls" aria-label="Touch controls">
-      <button data-dir="up" aria-label="Move up">▲</button><button data-dir="left" aria-label="Move left">◀</button><button data-dir="down" aria-label="Move down">▼</button><button data-dir="right" aria-label="Move right">▶</button>
+      <button data-dir="up" aria-label="Move up">⌃</button><button data-dir="left" aria-label="Move left">‹</button><button data-dir="down" aria-label="Move down">⌄</button><button data-dir="right" aria-label="Move right">›</button><span class="pad-core" aria-hidden="true"></span>
     </div>
   </main>
   <script>
@@ -73,13 +78,28 @@
       const overlay = document.querySelector('#overlay'), message = document.querySelector('#message');
       const instructions = document.querySelector('#instructions'), start = document.querySelector('#start');
       const cols = 19, rows = 17;
-      // Every floor tile joins one continuous route.  The open snow lanes between
-      // each ice-wall band prevent unreachable bottles from ever being created.
-      const mapTemplate = [
-        '###################', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '###################'
-      ];
+      let mapTemplate = [];
       const dirs = { up:{x:0,y:-1}, down:{x:0,y:1}, left:{x:-1,y:0}, right:{x:1,y:0} };
       let map, player, ghosts, score, running, tick, last, tile, w, h;
+      function createTundraMaze() {
+        const grid = Array.from({length: rows}, () => Array(cols).fill('#'));
+        const stack = [[9, 15]]; grid[15][9] = '.';
+        while (stack.length) {
+          const [x, y] = stack[stack.length - 1];
+          const choices = [[2,0],[-2,0],[0,2],[0,-2]].map(([dx,dy]) => [x+dx,y+dy,dx,dy]).filter(([nx,ny]) => nx > 0 && nx < cols-1 && ny > 0 && ny < rows-1 && grid[ny][nx] === '#');
+          if (!choices.length) { stack.pop(); continue; }
+          const [nx, ny, dx, dy] = choices[Math.floor(Math.random() * choices.length)];
+          grid[y + dy / 2][x + dx / 2] = '.'; grid[ny][nx] = '.'; stack.push([nx, ny]);
+        }
+        // A few extra thawed passages make the maze less linear without ever
+        // separating the connected path network created above.
+        for (let y = 1; y < rows - 1; y++) for (let x = 1; x < cols - 1; x++) {
+          const horizontal = grid[y][x-1] === '.' && grid[y][x+1] === '.';
+          const vertical = grid[y-1][x] === '.' && grid[y+1][x] === '.';
+          if (grid[y][x] === '#' && (horizontal || vertical) && Math.random() < .12) grid[y][x] = '.';
+        }
+        return grid.map(row => row.join(''));
+      }
       function createFairBottleMap() {
         const bottles = mapTemplate.map(row => row.split('').map(c => c === '.'));
         const seen = Array.from({length: rows}, () => Array(cols).fill(false));
@@ -96,10 +116,18 @@
         for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (!seen[y][x]) bottles[y][x] = false;
         return bottles;
       }
+      function ghostSpawnPoints() {
+        const choices = [];
+        for (let y = 1; y < rows - 1; y++) for (let x = 1; x < cols - 1; x++) if (mapTemplate[y][x] === '.' && Math.abs(x - 9) + Math.abs(y - 15) > 9) choices.push([x, y]);
+        choices.sort(() => Math.random() - .5);
+        return choices.slice(0, 3);
+      }
       function reset() {
+        mapTemplate = createTundraMaze();
         map = createFairBottleMap();
         player = {x:9,y:15,rx:9,ry:15,dir:'left',next:'left'};
-        ghosts = [{x:9,y:8,rx:9,ry:8,dir:'left',color:'#ee5069',brain:0}, {x:5,y:8,rx:5,ry:8,dir:'right',color:'#75e2ff',brain:6}, {x:13,y:8,rx:13,ry:8,dir:'up',color:'#ff9a3d',brain:12}];
+        const spawns = ghostSpawnPoints();
+        ghosts = spawns.map(([x,y], i) => ({x,y,rx:x,ry:y,dir:['left','right','up'][i],color:['#ee5069','#75e2ff','#ff9a3d'][i],brain:i*6}));
         map[player.y][player.x] = false; ghosts.forEach(g => map[g.y][g.x] = false); score = 0; tick = 0; updateHud();
       }
       function resize() { const rect = canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2); canvas.width = Math.round(rect.width*dpr); canvas.height = Math.round(rect.height*dpr); ctx.setTransform(dpr,0,0,dpr,0,0); w = rect.width; h = rect.height; tile = Math.min(w/cols, h/rows); draw(); }
