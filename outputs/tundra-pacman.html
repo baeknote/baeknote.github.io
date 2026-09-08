@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06192e">
+  <title>Tundra Pacman</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh; margin: 0; display: grid; place-items: center; overflow-x: hidden;
+      font-family: Impact, Haettenschweiler, "Arial Narrow Bold", system-ui, sans-serif;
+      color: #effcff; background: #06192e;
+      background-image: radial-gradient(circle at 13% 19%, #2d8fbc55 0 1px, transparent 2px), radial-gradient(circle at 80% 15%, #c0f6ff80 0 1px, transparent 2px), linear-gradient(155deg, #082848 0%, #06192e 48%, #102946 100%);
+      background-size: 73px 91px, 113px 107px, auto;
+    }
+    .snow { position: fixed; inset: 0; pointer-events: none; opacity: .45; background: radial-gradient(ellipse at 50% 120%, #dffbff33 0 20%, transparent 52%); }
+    .game-shell { width: min(96vw, 730px); padding: clamp(14px, 3vw, 28px); }
+    header { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 15px; }
+    h1 { margin: 0; font-size: clamp(2.2rem, 8vw, 4.7rem); letter-spacing: .045em; line-height: .82; color: #ffe02d; text-shadow: 3px 4px 0 #b56010, 0 0 20px #ffdc2b99; }
+    h1 small { display: block; font-family: system-ui, sans-serif; font-size: .18em; letter-spacing: .31em; color: #a7efff; text-shadow: none; margin: .5em 0 0 .18em; }
+    .score-panel { min-width: 130px; text-align: right; font-family: system-ui, sans-serif; font-weight: 800; font-size: .77rem; letter-spacing: .12em; color: #8edff3; }
+    #score { display: block; font-family: Impact, sans-serif; color: white; font-size: 2rem; letter-spacing: .07em; text-shadow: 0 0 14px #7ee8ff; }
+    .frame { position: relative; padding: clamp(7px, 1.5vw, 12px); border: 2px solid #63dffb; border-radius: 18px; background: #06223dde; box-shadow: 0 0 0 6px #0b456c, 0 0 32px #50d9ff66, inset 0 0 24px #45d8ff22; }
+    canvas { display: block; width: 100%; aspect-ratio: 1.115; border-radius: 10px; background: #082844; image-rendering: pixelated; }
+    .overlay { position: absolute; inset: 12px; border-radius: 10px; display: grid; place-items: center; text-align: center; background: #041528a8; backdrop-filter: blur(2px); transition: opacity .18s; }
+    .overlay[hidden] { display: none; }
+    .overlay-inner { padding: 20px; }
+    .overlay h2 { margin: 0 0 7px; font-size: clamp(2.1rem, 8vw, 4.2rem); color: #ffe02d; text-shadow: 3px 3px 0 #a75412; }
+    .overlay p { margin: 0 0 16px; font: 700 .9rem/1.45 system-ui, sans-serif; color: #d8faff; max-width: 330px; }
+    button { appearance: none; border: 2px solid #fff5a3; border-radius: 999px; padding: 11px 21px; font: 800 1rem system-ui, sans-serif; letter-spacing: .04em; color: #07192d; background: #ffe02d; cursor: pointer; box-shadow: 0 4px 0 #b65a12; transition: transform .1s, box-shadow .1s; }
+    button:hover { filter: brightness(1.08); }
+    button:active { transform: translateY(3px); box-shadow: 0 1px 0 #b65a12; }
+    .legend { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 13px; font: 700 .76rem/1.35 system-ui, sans-serif; letter-spacing: .035em; color: #c5eff8; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .bottle { width: 11px; height: 16px; display: inline-block; border: 2px solid #c7fbff; border-radius: 3px 3px 5px 5px; background: #49b8e1; position: relative; }
+    .bottle:before { content: ""; position: absolute; width: 5px; height: 5px; border: 2px solid #c7fbff; border-bottom: 0; top: -7px; left: 1px; border-radius: 2px 2px 0 0; }
+    .controls { display: none; grid-template-columns: repeat(3, 52px); justify-content: center; gap: 7px; margin: 18px auto 0; }
+    .controls button { width: 52px; height: 46px; padding: 0; border-radius: 12px; font-size: 1.35rem; color: #dffcff; background: #0c5079; border-color: #7de7ff; box-shadow: 0 3px 0 #042a48; }
+    .controls button:first-child { grid-column: 2; }
+    .controls button:last-child { grid-column: 3; grid-row: 2; }
+    .controls button:nth-child(3) { grid-column: 1; grid-row: 2; }
+    @media (pointer: coarse) { .controls { display: grid; } .legend .keys { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="snow"></div>
+  <main class="game-shell">
+    <header>
+      <h1>PACMAN<small>THE VODKA TUNDRA</small></h1>
+      <div class="score-panel">SCORE <strong id="score">0000</strong></div>
+    </header>
+    <section class="frame" aria-label="Tundra Pacman game">
+      <canvas id="game" aria-label="Pacman game board"></canvas>
+      <div class="overlay" id="overlay">
+        <div class="overlay-inner">
+          <h2 id="message">READY?</h2>
+          <p id="instructions">Collect the frosty vodka bottles. Stay clear of the spirits haunting the ice.</p>
+          <button id="start" type="button">START EXPEDITION</button>
+        </div>
+      </div>
+    </section>
+    <div class="legend"><span><i class="bottle"></i> VODKA +10</span><span class="keys">ARROW KEYS / WASD TO MOVE</span><span id="remaining">BOTTLES: 0</span></div>
+    <div class="controls" aria-label="Touch controls">
+      <button data-dir="up" aria-label="Move up">▲</button><button data-dir="left" aria-label="Move left">◀</button><button data-dir="down" aria-label="Move down">▼</button><button data-dir="right" aria-label="Move right">▶</button>
+    </div>
+  </main>
+  <script>
+    (() => {
+      const canvas = document.querySelector('#game'), ctx = canvas.getContext('2d');
+      const scoreEl = document.querySelector('#score'), remainingEl = document.querySelector('#remaining');
+      const overlay = document.querySelector('#overlay'), message = document.querySelector('#message');
+      const instructions = document.querySelector('#instructions'), start = document.querySelector('#start');
+      const cols = 19, rows = 17;
+      // Every floor tile joins one continuous route.  The open snow lanes between
+      // each ice-wall band prevent unreachable bottles from ever being created.
+      const mapTemplate = [
+        '###################', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '#.###.###.###.###.#', '#.................#', '###################'
+      ];
+      const dirs = { up:{x:0,y:-1}, down:{x:0,y:1}, left:{x:-1,y:0}, right:{x:1,y:0} };
+      let map, player, ghosts, score, running, tick, last, tile, w, h;
+      function createFairBottleMap() {
+        const bottles = mapTemplate.map(row => row.split('').map(c => c === '.'));
+        const seen = Array.from({length: rows}, () => Array(cols).fill(false));
+        const queue = [[9, 15]]; seen[15][9] = true;
+        for (let i = 0; i < queue.length; i++) {
+          const [x, y] = queue[i];
+          Object.values(dirs).forEach(d => {
+            const nx = x + d.x, ny = y + d.y;
+            if (!seen[ny]?.[nx] && mapTemplate[ny]?.[nx] !== '#') { seen[ny][nx] = true; queue.push([nx, ny]); }
+          });
+        }
+        // This guard means that, even if the maze is edited later, no bottle is
+        // placed in a disconnected pocket.
+        for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (!seen[y][x]) bottles[y][x] = false;
+        return bottles;
+      }
+      function reset() {
+        map = createFairBottleMap();
+        player = {x:9,y:15,rx:9,ry:15,dir:'left',next:'left'};
+        ghosts = [{x:9,y:8,rx:9,ry:8,dir:'left',color:'#ee5069',brain:0}, {x:5,y:8,rx:5,ry:8,dir:'right',color:'#75e2ff',brain:6}, {x:13,y:8,rx:13,ry:8,dir:'up',color:'#ff9a3d',brain:12}];
+        map[player.y][player.x] = false; ghosts.forEach(g => map[g.y][g.x] = false); score = 0; tick = 0; updateHud();
+      }
+      function resize() { const rect = canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2); canvas.width = Math.round(rect.width*dpr); canvas.height = Math.round(rect.height*dpr); ctx.setTransform(dpr,0,0,dpr,0,0); w = rect.width; h = rect.height; tile = Math.min(w/cols, h/rows); draw(); }
+      function isWall(x,y) { return x < 0 || x >= cols || y < 0 || y >= rows || mapTemplate[y][x] === '#'; }
+      function move(entity, dir) { const d = dirs[dir], nx = entity.x+d.x, ny = entity.y+d.y; if (!isWall(nx,ny)) { entity.x=nx; entity.y=ny; entity.dir=dir; return true; } return false; }
+      function updateHud() { scoreEl.textContent = String(score).padStart(4,'0'); remainingEl.textContent = `BOTTLES: ${map.flat().filter(Boolean).length}`; }
+      function setDir(dir) {
+        player.next = dir;
+        // Direction input must not move Pacman by itself: movement and collection
+        // are intentionally handled together in step(), one maze cell at a time.
+        if (running && !isWall(player.x + dirs[dir].x, player.y + dirs[dir].y)) player.dir = dir;
+      }
+      function step() {
+        if (!running) return;
+        tick++; if (!move(player,player.next)) move(player,player.dir);
+        if (map[player.y][player.x]) { map[player.y][player.x] = false; score += 10; updateHud(); }
+        if (ghosts.some(g => g.x === player.x && g.y === player.y)) return end(false);
+        ghosts.forEach(g => {
+          g.brain++;
+          const options = Object.keys(dirs).filter(d => !isWall(g.x+dirs[d].x,g.y+dirs[d].y));
+          const reverse = {up:'down',down:'up',left:'right',right:'left'}[g.dir];
+          let legal = options.filter(d => d !== reverse); if (!legal.length) legal = options;
+          if (g.brain % 3 === 0 || !legal.includes(g.dir)) {
+            legal.sort((a,b) => { const ad=dirs[a], bd=dirs[b]; return Math.abs(g.x+ad.x-player.x)+Math.abs(g.y+ad.y-player.y)-Math.abs(g.x+bd.x-player.x)-Math.abs(g.y+bd.y-player.y); });
+            g.dir = (Math.random() < .72 ? legal[0] : legal[Math.floor(Math.random()*legal.length)]);
+          }
+          move(g,g.dir);
+        });
+        if (ghosts.some(g => g.x === player.x && g.y === player.y)) return end(false);
+        if (!map.flat().some(Boolean)) return end(true);
+      }
+      function end(won) { running = false; message.textContent = won ? 'TUNDRA CLEARED!' : 'GAME OVER'; instructions.textContent = won ? `You collected every bottle — final score ${score}.` : `A ghost got you. Final score ${score}.`; start.textContent = 'PLAY AGAIN'; overlay.hidden = false; }
+      function drawBottle(x,y) { const px=x*tile, py=y*tile, cx=px+tile/2, s=tile*.28; ctx.save(); ctx.translate(cx,py+tile*.52); ctx.shadowColor='#b5f7ff';ctx.shadowBlur=7;ctx.fillStyle='#3da9d1';ctx.strokeStyle='#dbffff';ctx.lineWidth=Math.max(1,tile*.045); ctx.beginPath(); ctx.roundRect(-s*.52,-s*.38,s*1.04,s*1.15,s*.16);ctx.fill();ctx.stroke();ctx.beginPath();ctx.rect(-s*.25,-s*.73,s*.5,s*.38);ctx.fill();ctx.stroke();ctx.fillStyle='#f4fbff';ctx.fillRect(-s*.25,-s*.08,s*.5,s*.28);ctx.restore(); }
+      function glide(entity) { entity.rx += (entity.x - entity.rx) * .22; entity.ry += (entity.y - entity.ry) * .22; }
+      function drawPac() { glide(player); const cx=(player.rx+.5)*tile, cy=(player.ry+.5)*tile, r=tile*.37; const a={left:Math.PI,right:0,up:-Math.PI/2,down:Math.PI/2}[player.dir]; const bite=.18+Math.abs(Math.sin(performance.now()*.012))*.2; ctx.save();ctx.translate(cx,cy);ctx.rotate(a);ctx.shadowColor='#ffdf38';ctx.shadowBlur=13;ctx.fillStyle='#ffd92f';ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r,bite,Math.PI*2-bite);ctx.closePath();ctx.fill();ctx.fillStyle='#382313';ctx.beginPath();ctx.arc(r*.06,-r*.55,r*.09,0,Math.PI*2);ctx.fill();ctx.restore(); }
+      function drawGhost(g) { glide(g); const x=(g.rx+.5)*tile, y=(g.ry+.54)*tile, r=tile*.34;ctx.save();ctx.translate(x,y);ctx.shadowColor=g.color;ctx.shadowBlur=11;ctx.fillStyle=g.color;ctx.beginPath();ctx.arc(0,-r*.22,r,Math.PI,0);ctx.lineTo(r,r*.78);ctx.lineTo(r*.5,r*.48);ctx.lineTo(0,r*.78);ctx.lineTo(-r*.5,r*.48);ctx.lineTo(-r,r*.78);ctx.closePath();ctx.fill(); [[-.34,0],[.34,0]].forEach(([ex,ey])=>{ctx.fillStyle='white';ctx.beginPath();ctx.ellipse(ex*r,-r*.2,r*.28,r*.33,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#123452';ctx.beginPath();ctx.arc((ex+(dirs[g.dir]?.x||0)*.12)*r,(-.2+(dirs[g.dir]?.y||0)*.12)*r,r*.13,0,Math.PI*2);ctx.fill();});ctx.restore(); }
+      function draw() { if (!map) return; ctx.clearRect(0,0,w,h); ctx.fillStyle='#092b47';ctx.fillRect(0,0,w,h); for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) { const px=x*tile, py=y*tile; if(mapTemplate[y][x]==='#') { ctx.fillStyle='#154f7a';ctx.fillRect(px,py,tile,tile);ctx.strokeStyle='#65d9fa';ctx.lineWidth=Math.max(1,tile*.04);ctx.strokeRect(px+tile*.07,py+tile*.07,tile*.86,tile*.86);ctx.fillStyle='#a5f3ff22';ctx.fillRect(px+tile*.15,py+tile*.15,tile*.25,tile*.25); } else if (map[y][x]) drawBottle(x,y); } ghosts.forEach(drawGhost); drawPac(); }
+      function loop(now) { if (!last) last=now; if(now-last>125){step();last=now;} draw(); requestAnimationFrame(loop); }
+      function begin() { reset(); running=true; overlay.hidden=true; }
+      start.addEventListener('click', begin); window.addEventListener('resize', resize);
+      addEventListener('keydown', e => { const key=e.key.toLowerCase(), lookup={arrowup:'up',w:'up',arrowdown:'down',s:'down',arrowleft:'left',a:'left',arrowright:'right',d:'right'}; if(lookup[key]) {e.preventDefault(); setDir(lookup[key]);} if(key==='r' && running) end(false); if(key===' '&&!running) begin(); });
+      document.querySelectorAll('[data-dir]').forEach(b => b.addEventListener('pointerdown', () => setDir(b.dataset.dir)));
+      reset(); resize(); requestAnimationFrame(loop);
+    })();
+  </script>
+</body>
+</html>
