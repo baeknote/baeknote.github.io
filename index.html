@@ -1,11 +1,11 @@
 <!doctype html>
-<!-- Tundra Pacman: a self-contained, mobile-ready arcade game with fair, escape-friendly tundra mazes. -->
+<!-- Tundra Pacman: a self-contained arcade game with fair stages and frost-shot ghost counters. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06192e">
-  <meta name="description" content="A tundra-themed Pacman game with escape-friendly loop mazes, reachable vodka collectibles, and touch controls.">
+  <meta name="description" content="A tundra-themed Pacman game with escape-friendly stages, frost-shot power pellets, and touch controls.">
   <title>Tundra Pacman — The Vodka Tundra</title>
   <style>
     :root { color-scheme: dark; }
@@ -23,6 +23,7 @@
     h1 { margin: 0; font-size: clamp(2.2rem, 8vw, 4.7rem); letter-spacing: .045em; line-height: .82; color: #ffe02d; text-shadow: 3px 4px 0 #b56010, 0 0 20px #ffdc2b99; }
     h1 small { display: block; font-family: system-ui, sans-serif; font-size: .18em; letter-spacing: .31em; color: #a7efff; text-shadow: none; margin: .5em 0 0 .18em; }
     .score-panel { min-width: 130px; text-align: right; font-family: system-ui, sans-serif; font-weight: 800; font-size: .77rem; letter-spacing: .12em; color: #8edff3; }
+    .stage-panel { display: block; margin-bottom: 2px; font-size: .66rem; color: #ffe881; }
     #score { display: block; font-family: Impact, sans-serif; color: white; font-size: 2rem; letter-spacing: .07em; text-shadow: 0 0 14px #7ee8ff; }
     .frame { position: relative; padding: clamp(7px, 1.5vw, 12px); border: 2px solid #63dffb; border-radius: 18px; background: #06223dde; box-shadow: 0 0 0 6px #0b456c, 0 0 32px #50d9ff66, inset 0 0 24px #45d8ff22; }
     canvas { display: block; width: 100%; aspect-ratio: 1.115; border-radius: 10px; background: #082844; image-rendering: pixelated; }
@@ -34,7 +35,7 @@
     button { appearance: none; border: 2px solid #fff5a3; border-radius: 999px; padding: 11px 21px; font: 800 1rem system-ui, sans-serif; letter-spacing: .04em; color: #07192d; background: #ffe02d; cursor: pointer; box-shadow: 0 4px 0 #b65a12; transition: transform .1s, box-shadow .1s; }
     button:hover { filter: brightness(1.08); }
     button:active { transform: translateY(3px); box-shadow: 0 1px 0 #b65a12; }
-    .legend { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 13px; font: 700 .76rem/1.35 system-ui, sans-serif; letter-spacing: .035em; color: #c5eff8; }
+    .legend { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 12px; margin-top: 13px; font: 700 .76rem/1.35 system-ui, sans-serif; letter-spacing: .035em; color: #c5eff8; }
     .legend span { display: inline-flex; align-items: center; gap: 6px; }
     .bottle { width: 11px; height: 16px; display: inline-block; border: 2px solid #c7fbff; border-radius: 3px 3px 5px 5px; background: #49b8e1; position: relative; }
     .bottle:before { content: ""; position: absolute; width: 5px; height: 5px; border: 2px solid #c7fbff; border-bottom: 0; top: -7px; left: 1px; border-radius: 2px 2px 0 0; }
@@ -54,19 +55,19 @@
   <main class="game-shell">
     <header>
       <h1>PACMAN<small>THE VODKA TUNDRA</small></h1>
-      <div class="score-panel">SCORE <strong id="score">0000</strong></div>
+      <div class="score-panel"><span class="stage-panel">STAGE <b id="stage">01</b></span>SCORE <strong id="score">0000</strong></div>
     </header>
     <section class="frame" aria-label="Tundra Pacman game">
       <canvas id="game" aria-label="Pacman game board"></canvas>
       <div class="overlay" id="overlay">
         <div class="overlay-inner">
           <h2 id="message">READY?</h2>
-          <p id="instructions">Collect the frosty vodka bottles. Stay clear of the spirits haunting the ice.</p>
+          <p id="instructions">Collect vodka bottles and frost shots. A frost shot lets you send blue ghosts home.</p>
           <button id="start" type="button">START EXPEDITION</button>
         </div>
       </div>
     </section>
-    <div class="legend"><span><i class="bottle"></i> VODKA +10</span><span class="keys">ARROW KEYS / WASD TO MOVE</span><span id="remaining">BOTTLES: 0</span></div>
+    <div class="legend"><span><i class="bottle"></i> VODKA +10</span><span>✦ FROST SHOT +50</span><span class="keys">ARROW KEYS / WASD TO MOVE</span><span id="remaining">BOTTLES: 0</span></div>
     <div class="controls" aria-label="Touch controls">
       <button data-dir="up" aria-label="Move up">⌃</button><button data-dir="left" aria-label="Move left">‹</button><button data-dir="down" aria-label="Move down">⌄</button><button data-dir="right" aria-label="Move right">›</button><span class="pad-core" aria-hidden="true"></span>
     </div>
@@ -74,13 +75,13 @@
   <script>
     (() => {
       const canvas = document.querySelector('#game'), ctx = canvas.getContext('2d');
-      const scoreEl = document.querySelector('#score'), remainingEl = document.querySelector('#remaining');
+      const scoreEl = document.querySelector('#score'), stageEl = document.querySelector('#stage'), remainingEl = document.querySelector('#remaining');
       const overlay = document.querySelector('#overlay'), message = document.querySelector('#message');
       const instructions = document.querySelector('#instructions'), start = document.querySelector('#start');
       const cols = 19, rows = 17;
       let mapTemplate = [];
       const dirs = { up:{x:0,y:-1}, down:{x:0,y:1}, left:{x:-1,y:0}, right:{x:1,y:0} };
-      let map, player, ghosts, score, running, tick, last, tile, w, h;
+      let map, player, ghosts, score, stage, powerPellets, powerUntil, ghostCombo, running, tick, last, tile, w, h, stageTimer;
       function hasConnectedFloor(grid) {
         const seen = Array.from({length: rows}, () => Array(cols).fill(false));
         const queue = [[9, 15]]; seen[15][9] = true;
@@ -129,22 +130,28 @@
       }
       function ghostSpawnPoints() {
         const choices = [];
-        for (let y = 1; y < rows - 1; y++) for (let x = 1; x < cols - 1; x++) if (mapTemplate[y][x] === '.' && Math.abs(x - 9) + Math.abs(y - 15) > 9) choices.push([x, y]);
+        for (let y = 1; y < rows - 1; y++) for (let x = 1; x < cols - 1; x++) if (mapTemplate[y][x] === '.' && Math.abs(x - 9) + Math.abs(y - 15) > 9 && !['1,1', '17,1', '1,15', '17,15'].includes(pelletKey(x, y))) choices.push([x, y]);
         choices.sort(() => Math.random() - .5);
         return choices.slice(0, 3);
       }
-      function reset() {
+      function setupStage() {
         mapTemplate = createTundraMaze();
         map = createFairBottleMap();
         player = {x:9,y:15,rx:9,ry:15,dir:'left',next:'left'};
         const spawns = ghostSpawnPoints();
-        ghosts = spawns.map(([x,y], i) => ({x,y,rx:x,ry:y,dir:['left','right','up'][i],color:['#ee5069','#75e2ff','#ff9a3d'][i],brain:i*6}));
-        map[player.y][player.x] = false; ghosts.forEach(g => map[g.y][g.x] = false); score = 0; tick = 0; updateHud();
+        ghosts = spawns.map(([x,y], i) => ({x,y,homeX:x,homeY:y,rx:x,ry:y,dir:['left','right','up'][i],color:['#ee5069','#75e2ff','#ff9a3d'][i],brain:i*6}));
+        powerPellets = new Set(['1,1', '17,1', '1,15', '17,15']);
+        map[player.y][player.x] = false; ghosts.forEach(g => map[g.y][g.x] = false); powerUntil = 0; ghostCombo = 0; tick = 0;
+      }
+      function reset() {
+        score = 0; stage = 1; setupStage(); updateHud();
       }
       function resize() { const rect = canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2); canvas.width = Math.round(rect.width*dpr); canvas.height = Math.round(rect.height*dpr); ctx.setTransform(dpr,0,0,dpr,0,0); w = rect.width; h = rect.height; tile = Math.min(w/cols, h/rows); draw(); }
       function isWall(x,y) { return x < 0 || x >= cols || y < 0 || y >= rows || mapTemplate[y][x] === '#'; }
       function move(entity, dir) { const d = dirs[dir], nx = entity.x+d.x, ny = entity.y+d.y; if (!isWall(nx,ny)) { entity.x=nx; entity.y=ny; entity.dir=dir; return true; } return false; }
-      function updateHud() { scoreEl.textContent = String(score).padStart(4,'0'); remainingEl.textContent = `BOTTLES: ${map.flat().filter(Boolean).length}`; }
+      function pelletKey(x, y) { return `${x},${y}`; }
+      function powerActive() { return tick < powerUntil; }
+      function updateHud() { scoreEl.textContent = String(score).padStart(4,'0'); stageEl.textContent = String(stage).padStart(2,'0'); remainingEl.textContent = `BOTTLES: ${map.flat().filter(Boolean).length + powerPellets.size}`; }
       function setDir(dir) {
         player.next = dir;
         // Direction input must not move Pacman by itself: movement and collection
@@ -154,8 +161,10 @@
       function step() {
         if (!running) return;
         tick++; if (!move(player,player.next)) move(player,player.dir);
-        if (map[player.y][player.x]) { map[player.y][player.x] = false; score += 10; updateHud(); }
-        if (ghosts.some(g => g.x === player.x && g.y === player.y)) return end(false);
+        const key = pelletKey(player.x, player.y);
+        if (powerPellets.delete(key)) { score += 50; powerUntil = tick + 56; ghostCombo = 0; updateHud(); }
+        else if (map[player.y][player.x]) { map[player.y][player.x] = false; score += 10; updateHud(); }
+        if (resolveGhostContacts()) return;
         ghosts.forEach((g, index) => {
           // Ghosts move on alternate beats, giving Pacman room to choose one
           // of the maze's looped escape routes instead of facing equal speed.
@@ -170,19 +179,23 @@
           }
           move(g,g.dir);
         });
-        if (ghosts.some(g => g.x === player.x && g.y === player.y)) return end(false);
-        if (!map.flat().some(Boolean)) return end(true);
+        if (resolveGhostContacts()) return;
+        if (!map.flat().some(Boolean) && powerPellets.size === 0) advanceStage();
       }
-      function end(won) { running = false; message.textContent = won ? 'TUNDRA CLEARED!' : 'GAME OVER'; instructions.textContent = won ? `You collected every bottle — final score ${score}.` : `A ghost got you. Final score ${score}.`; start.textContent = 'PLAY AGAIN'; overlay.hidden = false; }
+      function sendGhostHome(g) { const bonus = 200 * (2 ** ghostCombo++); score += bonus; g.x = g.homeX; g.y = g.homeY; g.rx = g.homeX; g.ry = g.homeY; g.dir = 'left'; g.brain = 0; updateHud(); }
+      function resolveGhostContacts() { const contacts = ghosts.filter(g => g.x === player.x && g.y === player.y); if (!contacts.length) return false; if (powerActive()) { contacts.forEach(sendGhostHome); return false; } end(false); return true; }
+      function advanceStage() { running = false; stage++; setupStage(); updateHud(); message.textContent = `STAGE ${stage}`; instructions.textContent = 'The ice has shifted. Frost shots can turn the ghosts blue.'; start.hidden = true; overlay.hidden = false; clearTimeout(stageTimer); stageTimer = setTimeout(() => { stageTimer = undefined; running = true; start.hidden = false; overlay.hidden = true; }, 1100); }
+      function end() { clearTimeout(stageTimer); running = false; message.textContent = 'GAME OVER'; instructions.textContent = `A ghost got you. Final score ${score}.`; start.hidden = false; start.textContent = 'PLAY AGAIN'; overlay.hidden = false; }
       function drawBottle(x,y) { const px=x*tile, py=y*tile, cx=px+tile/2, s=tile*.28; ctx.save(); ctx.translate(cx,py+tile*.52); ctx.shadowColor='#b5f7ff';ctx.shadowBlur=7;ctx.fillStyle='#3da9d1';ctx.strokeStyle='#dbffff';ctx.lineWidth=Math.max(1,tile*.045); ctx.beginPath(); ctx.roundRect(-s*.52,-s*.38,s*1.04,s*1.15,s*.16);ctx.fill();ctx.stroke();ctx.beginPath();ctx.rect(-s*.25,-s*.73,s*.5,s*.38);ctx.fill();ctx.stroke();ctx.fillStyle='#f4fbff';ctx.fillRect(-s*.25,-s*.08,s*.5,s*.28);ctx.restore(); }
       function glide(entity) { entity.rx += (entity.x - entity.rx) * .22; entity.ry += (entity.y - entity.ry) * .22; }
       function drawPac() { glide(player); const cx=(player.rx+.5)*tile, cy=(player.ry+.5)*tile, r=tile*.37; const a={left:Math.PI,right:0,up:-Math.PI/2,down:Math.PI/2}[player.dir]; const bite=.18+Math.abs(Math.sin(performance.now()*.012))*.2; ctx.save();ctx.translate(cx,cy);ctx.rotate(a);ctx.shadowColor='#ffdf38';ctx.shadowBlur=13;ctx.fillStyle='#ffd92f';ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r,bite,Math.PI*2-bite);ctx.closePath();ctx.fill();ctx.fillStyle='#382313';ctx.beginPath();ctx.arc(r*.06,-r*.55,r*.09,0,Math.PI*2);ctx.fill();ctx.restore(); }
-      function drawGhost(g) { glide(g); const x=(g.rx+.5)*tile, y=(g.ry+.54)*tile, r=tile*.34;ctx.save();ctx.translate(x,y);ctx.shadowColor=g.color;ctx.shadowBlur=11;ctx.fillStyle=g.color;ctx.beginPath();ctx.arc(0,-r*.22,r,Math.PI,0);ctx.lineTo(r,r*.78);ctx.lineTo(r*.5,r*.48);ctx.lineTo(0,r*.78);ctx.lineTo(-r*.5,r*.48);ctx.lineTo(-r,r*.78);ctx.closePath();ctx.fill(); [[-.34,0],[.34,0]].forEach(([ex,ey])=>{ctx.fillStyle='white';ctx.beginPath();ctx.ellipse(ex*r,-r*.2,r*.28,r*.33,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#123452';ctx.beginPath();ctx.arc((ex+(dirs[g.dir]?.x||0)*.12)*r,(-.2+(dirs[g.dir]?.y||0)*.12)*r,r*.13,0,Math.PI*2);ctx.fill();});ctx.restore(); }
-      function draw() { if (!map) return; ctx.clearRect(0,0,w,h); ctx.fillStyle='#092b47';ctx.fillRect(0,0,w,h); for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) { const px=x*tile, py=y*tile; if(mapTemplate[y][x]==='#') { ctx.fillStyle='#154f7a';ctx.fillRect(px,py,tile,tile);ctx.strokeStyle='#65d9fa';ctx.lineWidth=Math.max(1,tile*.04);ctx.strokeRect(px+tile*.07,py+tile*.07,tile*.86,tile*.86);ctx.fillStyle='#a5f3ff22';ctx.fillRect(px+tile*.15,py+tile*.15,tile*.25,tile*.25); } else if (map[y][x]) drawBottle(x,y); } ghosts.forEach(drawGhost); drawPac(); }
+      function drawGhost(g) { glide(g); const x=(g.rx+.5)*tile, y=(g.ry+.54)*tile, r=tile*.34, frightened=powerActive();ctx.save();ctx.translate(x,y);ctx.shadowColor=frightened?'#8ef5ff':g.color;ctx.shadowBlur=11;ctx.fillStyle=frightened?'#2779dc':g.color; if(frightened && powerUntil-tick<12 && tick%4<2) ctx.globalAlpha=.55;ctx.beginPath();ctx.arc(0,-r*.22,r,Math.PI,0);ctx.lineTo(r,r*.78);ctx.lineTo(r*.5,r*.48);ctx.lineTo(0,r*.78);ctx.lineTo(-r*.5,r*.48);ctx.lineTo(-r,r*.78);ctx.closePath();ctx.fill(); [[-.34,0],[.34,0]].forEach(([ex,ey])=>{ctx.fillStyle='white';ctx.beginPath();ctx.ellipse(ex*r,-r*.2,r*.28,r*.33,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#123452';ctx.beginPath();ctx.arc((ex+(dirs[g.dir]?.x||0)*.12)*r,(-.2+(dirs[g.dir]?.y||0)*.12)*r,r*.13,0,Math.PI*2);ctx.fill();});ctx.restore(); }
+      function drawPowerPellet(x,y) { const cx=(x+.5)*tile,cy=(y+.5)*tile,r=tile*(.17+Math.abs(Math.sin(performance.now()*.008))*.07);ctx.save();ctx.shadowColor='#effcff';ctx.shadowBlur=13;ctx.fillStyle='#f3fdff';ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#8deeff';ctx.lineWidth=tile*.055;ctx.beginPath();ctx.arc(cx,cy,r*1.55,0,Math.PI*2);ctx.stroke();ctx.restore(); }
+      function draw() { if (!map) return; ctx.clearRect(0,0,w,h); ctx.fillStyle='#092b47';ctx.fillRect(0,0,w,h); for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) { const px=x*tile, py=y*tile; if(mapTemplate[y][x]==='#') { ctx.fillStyle='#154f7a';ctx.fillRect(px,py,tile,tile);ctx.strokeStyle='#65d9fa';ctx.lineWidth=Math.max(1,tile*.04);ctx.strokeRect(px+tile*.07,py+tile*.07,tile*.86,tile*.86);ctx.fillStyle='#a5f3ff22';ctx.fillRect(px+tile*.15,py+tile*.15,tile*.25,tile*.25); } else if (powerPellets.has(pelletKey(x,y))) drawPowerPellet(x,y); else if (map[y][x]) drawBottle(x,y); } ghosts.forEach(drawGhost); drawPac(); }
       function loop(now) { if (!last) last=now; if(now-last>125){step();last=now;} draw(); requestAnimationFrame(loop); }
-      function begin() { reset(); running=true; overlay.hidden=true; }
+      function begin() { clearTimeout(stageTimer); reset(); running=true; start.hidden = false; overlay.hidden=true; }
       start.addEventListener('click', begin); window.addEventListener('resize', resize);
-      addEventListener('keydown', e => { const key=e.key.toLowerCase(), lookup={arrowup:'up',w:'up',arrowdown:'down',s:'down',arrowleft:'left',a:'left',arrowright:'right',d:'right'}; if(lookup[key]) {e.preventDefault(); setDir(lookup[key]);} if(key==='r' && running) end(false); if(key===' '&&!running) begin(); });
+      addEventListener('keydown', e => { const key=e.key.toLowerCase(), lookup={arrowup:'up',w:'up',arrowdown:'down',s:'down',arrowleft:'left',a:'left',arrowright:'right',d:'right'}; if(lookup[key]) {e.preventDefault(); setDir(lookup[key]);} if(key==='r' && (running || stageTimer)) end(); if(key===' '&&!running) begin(); });
       document.querySelectorAll('[data-dir]').forEach(b => b.addEventListener('pointerdown', () => setDir(b.dataset.dir)));
       reset(); resize(); requestAnimationFrame(loop);
     })();
